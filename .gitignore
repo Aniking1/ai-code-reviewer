@@ -10,3 +10,4 @@ coverage
 *.db-*
 *.duckdb
 *.duckdb.wal
+workspace/
