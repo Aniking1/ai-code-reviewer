@@ -14,7 +14,9 @@
     "test:watch": "node --import tsx --test --watch"
   },
   "dependencies": {
+    "@ai-sdk/openai": "^4.0.51",
     "@mastra/core": "1.63.0",
+    "ai": "^7.0.84",
     "zod": "^4.5.2"
   },
   "devDependencies": {

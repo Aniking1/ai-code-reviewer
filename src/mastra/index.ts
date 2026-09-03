@@ -1,3 +1,9 @@
-import { Mastra } from '@mastra/core/mastra';
+import { Mastra } from "@mastra/core/mastra";
 
-export const mastra = new Mastra({});
+import { reviewAgent } from "./agents/review-agent.js";
+
+export const mastra = new Mastra({
+  agents: {
+    reviewAgent,
+  },
+});

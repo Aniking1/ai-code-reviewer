@@ -24,4 +24,6 @@ export const reviewInputSchema = z.discriminatedUnion("type", [
   }),
 ]);
 
-export type ReviewInput = z.infer<typeof reviewInputSchema>;
+export type ReviewInput = z.infer<
+  typeof reviewInputSchema
+>;
