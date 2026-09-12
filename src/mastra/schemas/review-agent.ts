@@ -1,7 +1,20 @@
+
 import { Agent } from "@mastra/core/agent";
 import { createOpenAI } from "@ai-sdk/openai";
 
 import { getConfig } from "../config.js";
+import { repositoryTools } from "../tools/repository-tools.js";
+
+const {
+  openRouterApiKey,
+  modelName,
+} = getConfig();
+
+const openrouter = createOpenAI({
+  apiKey: openRouterApiKey,
+  baseURL:
+    "https://openrouter.ai/api/v1",
+});
 
 export const reviewAgent = new Agent({
   id: "code-review-agent",
@@ -51,18 +64,7 @@ Rules:
 9. The specialist for this reviewer is "general-reviewer".
 `,
 
-  model: () => {
-    const {
-      openRouterApiKey,
-      modelName,
-    } = getConfig();
+  model: openrouter.chat(modelName),
 
-    const openrouter = createOpenAI({
-      apiKey: openRouterApiKey,
-      baseURL:
-        "https://openrouter.ai/api/v1",
-    });
-
-    return openrouter(modelName);
-  },
+  tools: repositoryTools,
 });

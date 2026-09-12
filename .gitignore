@@ -1,4 +1,4 @@
-node_modules
+﻿node_modules
 dist
 .mastra
 .next
@@ -10,4 +10,7 @@ coverage
 *.db-*
 *.duckdb
 *.duckdb.wal
-workspace/
+
+workspace/*
+!workspace/repositories/
+!workspace/repositories/**

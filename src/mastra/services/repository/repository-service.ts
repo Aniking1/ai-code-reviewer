@@ -1,6 +1,7 @@
-
-import fs from "node:fs/promises";
+﻿import fs from "node:fs/promises";
+import { existsSync } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
@@ -8,11 +9,52 @@ import type { RepositoryInfo } from "../../schemas/repository.js";
 
 const execFileAsync = promisify(execFile);
 
-const WORKSPACE_ROOT = path.resolve(
-  process.cwd(),
-  "workspace",
-  "repositories",
-);
+function findWorkspaceRepositoriesRoot(): string {
+  const startingDirectories = [
+    process.cwd(),
+    path.dirname(fileURLToPath(import.meta.url)),
+  ];
+
+  for (const startingDirectory of startingDirectories) {
+    let currentDirectory =
+      path.resolve(startingDirectory);
+
+    while (true) {
+      const candidate = path.join(
+        currentDirectory,
+        "workspace",
+        "repositories",
+      );
+
+      if (existsSync(candidate)) {
+        return candidate;
+      }
+
+      const parentDirectory =
+        path.dirname(currentDirectory);
+
+      if (
+        parentDirectory === currentDirectory
+      ) {
+        break;
+      }
+
+      currentDirectory = parentDirectory;
+    }
+  }
+
+  throw new Error(
+    "Unable to locate the workspace/repositories directory.",
+  );
+}
+
+const WORKSPACE_ROOT =
+  findWorkspaceRepositoriesRoot();
+
+const PROJECT_ROOT =
+  path.dirname(
+    path.dirname(WORKSPACE_ROOT),
+  );
 
 export type ChangedFileStatus =
   | "added"
@@ -37,10 +79,24 @@ export interface CommitInfo {
   diff: string;
 }
 
+function resolveRepositoryInput(
+  repositoryPath: string,
+): string {
+  if (path.isAbsolute(repositoryPath)) {
+    return path.resolve(repositoryPath);
+  }
+
+  return path.resolve(
+    PROJECT_ROOT,
+    repositoryPath,
+  );
+}
+
 export async function validateRepositoryPath(
   repositoryPath: string,
 ): Promise<string> {
-  const resolvedPath = path.resolve(repositoryPath);
+  const resolvedPath =
+    resolveRepositoryInput(repositoryPath);
 
   const relativePath = path.relative(
     WORKSPACE_ROOT,
@@ -59,7 +115,9 @@ export async function validateRepositoryPath(
   const stats = await fs.stat(resolvedPath);
 
   if (!stats.isDirectory()) {
-    throw new Error("Repository path must be a directory.");
+    throw new Error(
+      "Repository path must be a directory.",
+    );
   }
 
   try {
@@ -87,27 +145,29 @@ export async function getRepositoryInfo(
   const resolvedPath =
     await validateRepositoryPath(repositoryPath);
 
-  const [{ stdout: branch }, { stdout: commit }] =
-    await Promise.all([
-      execFileAsync(
-        "git",
-        [
-          "-C",
-          resolvedPath,
-          "branch",
-          "--show-current",
-        ],
-      ),
-      execFileAsync(
-        "git",
-        [
-          "-C",
-          resolvedPath,
-          "rev-parse",
-          "HEAD",
-        ],
-      ),
-    ]);
+  const [
+    { stdout: branch },
+    { stdout: commit },
+  ] = await Promise.all([
+    execFileAsync(
+      "git",
+      [
+        "-C",
+        resolvedPath,
+        "branch",
+        "--show-current",
+      ],
+    ),
+    execFileAsync(
+      "git",
+      [
+        "-C",
+        resolvedPath,
+        "rev-parse",
+        "HEAD",
+      ],
+    ),
+  ]);
 
   return {
     path: resolvedPath,
@@ -148,7 +208,9 @@ export async function readFile(
   filePath: string,
 ): Promise<string> {
   const resolvedRepositoryPath =
-    await validateRepositoryPath(repositoryPath);
+    await validateRepositoryPath(
+      repositoryPath,
+    );
 
   const resolvedFilePath = path.resolve(
     resolvedRepositoryPath,
@@ -169,7 +231,9 @@ export async function readFile(
     );
   }
 
-  const stats = await fs.stat(resolvedFilePath);
+  const stats = await fs.stat(
+    resolvedFilePath,
+  );
 
   if (!stats.isFile()) {
     throw new Error(
@@ -177,7 +241,10 @@ export async function readFile(
     );
   }
 
-  return fs.readFile(resolvedFilePath, "utf8");
+  return fs.readFile(
+    resolvedFilePath,
+    "utf8",
+  );
 }
 
 export async function getChangedFiles(
@@ -186,7 +253,9 @@ export async function getChangedFiles(
   targetRef: string,
 ): Promise<ChangedFile[]> {
   const resolvedPath =
-    await validateRepositoryPath(repositoryPath);
+    await validateRepositoryPath(
+      repositoryPath,
+    );
 
   const { stdout } = await execFileAsync(
     "git",
@@ -209,7 +278,8 @@ export async function getChangedFiles(
     .filter(Boolean)
     .map((line) => {
       const parts = line.split("\t");
-      const statusCode = parts[0] ?? "";
+      const statusCode =
+        parts[0] ?? "";
 
       if (statusCode.startsWith("R")) {
         return {
@@ -227,7 +297,8 @@ export async function getChangedFiles(
         };
       }
 
-      const pathValue = parts[1] ?? "";
+      const pathValue =
+        parts[1] ?? "";
 
       const statusMap: Record<
         string,
@@ -241,7 +312,8 @@ export async function getChangedFiles(
       return {
         path: pathValue,
         status:
-          statusMap[statusCode] ?? "unknown",
+          statusMap[statusCode] ??
+          "unknown",
       };
     });
 }
@@ -252,7 +324,9 @@ export async function getDiff(
   targetRef: string,
 ): Promise<string> {
   const resolvedPath =
-    await validateRepositoryPath(repositoryPath);
+    await validateRepositoryPath(
+      repositoryPath,
+    );
 
   const { stdout } = await execFileAsync(
     "git",
@@ -276,7 +350,9 @@ export async function getCommit(
   commitRef: string,
 ): Promise<CommitInfo> {
   const resolvedPath =
-    await validateRepositoryPath(repositoryPath);
+    await validateRepositoryPath(
+      repositoryPath,
+    );
 
   const { stdout: metadata } =
     await execFileAsync(
@@ -291,34 +367,47 @@ export async function getCommit(
       ],
     );
 
-  const metadataParts = metadata
-    .trim()
-    .split("\0");
+  const metadataParts =
+    metadata.trim().split("\0");
 
-  const hash = metadataParts[0] ?? "";
-  const subject = metadataParts[1] ?? "";
-  const author = metadataParts[2] ?? "";
-  const date = metadataParts[3] ?? "";
+  const hash =
+    metadataParts[0] ?? "";
 
-  if (!hash || !subject || !author || !date) {
+  const subject =
+    metadataParts[1] ?? "";
+
+  const author =
+    metadataParts[2] ?? "";
+
+  const date =
+    metadataParts[3] ?? "";
+
+  if (
+    !hash ||
+    !subject ||
+    !author ||
+    !date
+  ) {
     throw new Error(
       "Unable to read commit metadata.",
     );
   }
 
-  const [changedFiles, diff] =
-    await Promise.all([
-      getChangedFiles(
-        repositoryPath,
-        `${commitRef}^`,
-        commitRef,
-      ),
-      getDiff(
-        repositoryPath,
-        `${commitRef}^`,
-        commitRef,
-      ),
-    ]);
+  const [
+    changedFiles,
+    diff,
+  ] = await Promise.all([
+    getChangedFiles(
+      repositoryPath,
+      `${commitRef}^`,
+      commitRef,
+    ),
+    getDiff(
+      repositoryPath,
+      `${commitRef}^`,
+      commitRef,
+    ),
+  ]);
 
   return {
     hash,
@@ -329,4 +418,3 @@ export async function getCommit(
     diff,
   };
 }
-

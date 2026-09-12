@@ -1,4 +1,4 @@
-import { createOpenAI } from "@ai-sdk/openai";
+﻿import { createOpenAI } from "@ai-sdk/openai";
 import { generateText } from "ai";
 import { z } from "zod";
 
@@ -14,17 +14,117 @@ const findingsResponseSchema = z.object({
   findings: z.array(findingSchema),
 });
 
+export type SpecialistId =
+  | "correctness"
+  | "security"
+  | "architecture"
+  | "performance"
+  | "maintainability"
+  | "testing";
+
+export type SpecialistActivityStatus =
+  | "selected"
+  | "not_selected";
+
+export interface SpecialistActivity {
+  id: SpecialistId;
+  label: string;
+  description: string;
+  status: SpecialistActivityStatus;
+}
+
+export interface ReviewActivity {
+  supervisor: "completed";
+  specialists: SpecialistActivity[];
+}
+
 export interface ReviewResult {
   findings: Finding[];
   summary: string;
+  activity?: ReviewActivity;
+}
+
+interface ReviewAgentGenerateOptions {
+  hooks?: {
+    beforeToolCall?: (event: {
+      toolName: string;
+    }) => void;
+  };
 }
 
 interface ReviewAgent {
   generate(
     prompt: string,
+    options?: ReviewAgentGenerateOptions,
   ): Promise<{
     text: string;
   }>;
+}
+
+const specialistActivityDefinitions: Array<{
+  id: SpecialistId;
+  label: string;
+  description: string;
+  toolName: string;
+}> = [
+  {
+    id: "correctness",
+    label: "Correctness",
+    description: "Logic and behavior",
+    toolName: "agent-correctnessAgent",
+  },
+  {
+    id: "security",
+    label: "Security",
+    description: "Security vulnerabilities",
+    toolName: "agent-securityAgent",
+  },
+  {
+    id: "architecture",
+    label: "Architecture",
+    description: "Design and coupling",
+    toolName: "agent-architectureAgent",
+  },
+  {
+    id: "performance",
+    label: "Performance",
+    description: "Performance and scale",
+    toolName: "agent-performanceAgent",
+  },
+  {
+    id: "maintainability",
+    label: "Maintainability",
+    description: "Code quality",
+    toolName: "agent-maintainabilityAgent",
+  },
+  {
+    id: "testing",
+    label: "Testing",
+    description: "Tests and coverage",
+    toolName: "agent-testingAgent",
+  },
+];
+
+function buildReviewActivity(
+  selectedToolNames: Set<string>,
+): ReviewActivity {
+  return {
+    supervisor: "completed",
+    specialists:
+      specialistActivityDefinitions.map(
+        (specialist) => ({
+          id: specialist.id,
+          label: specialist.label,
+          description:
+            specialist.description,
+          status: selectedToolNames.has(
+            specialist.toolName,
+          )
+            ? "selected"
+            : "not_selected",
+        }),
+      ),
+  };
 }
 
 function buildReviewPrompt(
@@ -216,15 +316,33 @@ async function generateAgentReview(
 ): Promise<ReviewResult> {
   const prompt = buildReviewPrompt(context);
 
+  const selectedToolNames =
+    new Set<string>();
+
   const result = await agent.generate(
     prompt,
+    {
+      hooks: {
+        beforeToolCall: ({ toolName }) => {
+          selectedToolNames.add(
+            toolName,
+          );
+        },
+      },
+    },
   );
 
   const findings = parseModelResponse(
     result.text,
   );
 
-  return buildReviewResult(findings);
+  return {
+    ...buildReviewResult(findings),
+    activity:
+      buildReviewActivity(
+        selectedToolNames,
+      ),
+  };
 }
 
 export async function runAgentReview(

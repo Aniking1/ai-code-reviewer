@@ -10,8 +10,9 @@
     "dev": "mastra dev",
     "build": "mastra build",
     "start": "mastra start",
-    "test": "node --import tsx --test",
-    "test:watch": "node --import tsx --test --watch"
+    "test": "node --env-file=.env --import tsx --test src/mastra/**/__tests__/*.test.ts",
+    "test:watch": "node --env-file=.env --import tsx --test --watch src/mastra/**/__tests__/*.test.ts",
+    "evaluation:setup": "node evaluation/setup-fixtures.mjs"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.51",
