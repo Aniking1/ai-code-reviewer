@@ -1,86 +1,204 @@
-﻿# AI Code Reviewer
+﻿AI Code Reviewer
 
 An agentic AI code-review system built with Mastra and Next.js.
 
-## Overview
+Overview
 
-The system reviews Git repositories, individual commits, and Git diffs.
+AI Code Reviewer reviews software changes and coordinates multiple specialist agents to produce a consolidated, actionable code-review report.
 
-A Code Review Supervisor Agent coordinates specialist review agents for:
+The system supports:
 
-- Correctness and Logic
-- Security
-- Architecture and Design
-- Performance and Scalability
-- Code Quality and Maintainability
-- Testing
+Local Git repository reviews
 
-The Supervisor selectively delegates relevant review activities rather than automatically invoking every specialist.
+Individual Git commit reviews
 
-## Features
+Git diff reviews
 
-- Repository review
-- Individual Git commit review
-- Git diff review
-- Supervisor and specialist-agent architecture
-- Selective specialist delegation
-- Repository-aware code analysis
-- Structured findings
-- Severity and confidence prioritization
-- Duplicate and overlapping finding consolidation
-- Overall review recommendations
-- Review history
-- Review-detail view
-- Specialist activity tracking
-- Finding filters by file, category, and severity
-- Graceful AI-provider error handling
-- Five known-defect evaluation scenarios
+GitHub Pull Request reviews
 
-## Architecture
+Selective specialist-agent delegation
 
-```text
-Next.js Frontend
-       |
-       v
-POST /review
-       |
-       v
-Review Service
-       |
-       v
-Review Context Service
-       |
-       v
-Code Review Supervisor Agent
-       |
-       +---- Correctness and Logic Agent
-       +---- Security Agent
-       +---- Architecture and Design Agent
-       +---- Performance and Scalability Agent
-       +---- Code Quality and Maintainability Agent
-       +---- Testing Agent
-       |
-       v
-Finding Validation and Consolidation
-       |
-       +---- Recommendation
-       +---- Review History
-       |
-       v
-Next.js Review UI
+Repository-aware code analysis
 
-The Supervisor determines which specialist agents are relevant rather than automatically invoking every agent.
+High-severity cross-validation when appropriate
 
-Requirements
+Duplicate and overlapping finding consolidation
+
+Severity and confidence prioritization
+
+Persistent review history
+
+Finding filters by file, category, and severity
+
+Specialist-agent activity tracking
+
+Structured provider-error handling
+
+Five known-defect evaluation scenarios
+
+Review Architecture
+
+                         Next.js Review UI
+                                 |
+                                 v
+                           POST /review
+                                 |
+                                 v
+                        Review Service
+                                 |
+                                 v
+                    Review Context Service
+                         /      |       \
+                        /       |        \
+                 Repository   Commit   Pull Request
+                        \       |        /
+                         \      |       /
+                          Git / GitHub
+                                 |
+                                 v
+                    Code Review Supervisor
+                                 |
+             +-------------------+-------------------+
+             |         |         |         |         |
+             v         v         v         v         v
+        Correctness  Security  Architecture  Performance
+             |         |         |         |
+             +---------+---------+---------+------+
+                                 |
+                                 v
+                     Maintainability + Testing
+                                 |
+                                 v
+                  Finding Validation / Consolidation
+                                 |
+                    +------------+-------------+
+                    |                          |
+                    v                          v
+             Recommendation              Review History
+                    |
+                    v
+                Review Report
+
+The Supervisor determines which specialist agents are relevant to the supplied change rather than automatically invoking every specialist.
+
+Specialist Agents
+
+Correctness & Logic Agent
+
+Reviews logical errors, incorrect behavior, edge cases, control-flow problems, exception handling, and regression risks.
+
+Security Agent
+
+Reviews authentication, authorization, injection vulnerabilities, user-controlled input, sensitive-data exposure, trust boundaries, security configuration, and insecure command or data handling.
+
+Architecture & Design Agent
+
+Reviews architectural boundaries, coupling, abstractions, dependency direction, layering, responsibility placement, and repository design consistency.
+
+Performance & Scalability Agent
+
+Reviews inefficient algorithms, excessive loops, repeated I/O, database or network overhead, blocking operations, memory concerns, and scalability problems.
+
+Code Quality & Maintainability Agent
+
+Reviews complexity, duplication, modularity, readability, dead code, fragile implementation patterns, and maintainability risks.
+
+Testing Agent
+
+Reviews missing regression tests, edge-case tests, failure-path tests, changed-behavior coverage, and other concrete testing weaknesses.
+
+Finding Model
+
+Each finding can include:
+
+ID
+
+Short title
+
+Category
+
+Severity
+
+Confidence
+
+File
+
+Line range when supported
+
+Explanation
+
+Potential impact
+
+Recommended fix
+
+Repository evidence
+
+Specialist attribution
+
+Supported categories:
+
+CORRECTNESS
+SECURITY
+ARCHITECTURE
+PERFORMANCE
+MAINTAINABILITY
+TESTING
+
+Supported severities:
+
+CRITICAL
+HIGH
+MEDIUM
+LOW
+OPTIONAL
+
+Supported confidence levels:
+
+VERY_HIGH
+HIGH
+MEDIUM
+LOW
+
+Review Recommendations
+
+The system produces one overall recommendation:
+
+APPROVE
+APPROVE WITH COMMENTS
+REQUEST CHANGES
+BLOCK MERGE
+
+The recommendation is derived from the consolidated findings:
+
+CRITICAL findings -> BLOCK MERGE
+
+HIGH findings -> REQUEST CHANGES
+
+Medium, Low, or Optional findings -> APPROVE WITH COMMENTS
+
+No meaningful findings -> APPROVE
+
+Prerequisites
+
 Node.js 22.13.0 or later
+
 npm
+
+Git
+
 OpenRouter API key
+
+For GitHub Pull Request reviews, a public repository can be tested without a GitHub token in suitable cases. GITHUB_TOKEN may be supplied for authenticated access and private repositories.
+
 Installation
 
 Clone the repository:
 
-git clone <YOUR_GITHUB_REPOSITORY_URL>
+git clone https://github.com/Aniking1/ai-code-reviewer.git
 cd ai-code-reviewer
+
+Install backend dependencies:
+
 npm install
 
 Install frontend dependencies:
@@ -88,9 +206,10 @@ Install frontend dependencies:
 cd frontend
 npm install
 cd ..
+
 Environment Configuration
 
-Create a .env file from .env.example.
+Create a local .env file from .env.example.
 
 PowerShell:
 
@@ -100,8 +219,11 @@ Configure:
 
 OPENROUTER_API_KEY=your_openrouter_api_key
 MODEL_NAME=your_openrouter_model
+GITHUB_TOKEN=your_github_token
 
-Never commit .env.
+GITHUB_TOKEN may be left empty when testing suitable public GitHub repositories.
+
+Never commit .env, API keys, GitHub tokens, or credentials.
 
 Running the Backend
 
@@ -113,9 +235,6 @@ The Mastra backend runs on:
 
 http://localhost:4111
 
-The API is available under:
-
-http://localhost:4111/api
 Running the Frontend
 
 Open a second terminal:
@@ -123,12 +242,13 @@ Open a second terminal:
 cd frontend
 npm run dev
 
-The Next.js application runs on:
+Open:
 
 http://localhost:3000
-Preparing a Repository for Review
 
-Repositories reviewed by the application must be located inside:
+Reviewing a Local Repository
+
+Repositories reviewed through the local repository workflow should be located inside:
 
 workspace/repositories/
 
@@ -136,142 +256,152 @@ Example:
 
 workspace/repositories/sample-repo/
 
-The repository must be a valid Git repository.
+The target must be a valid Git repository.
 
-Example:
+In the UI:
 
-git clone <REPOSITORY_URL> workspace/repositories/sample-repo
-Running a Repository Review
+Select Repository.
 
-Open:
+Enter a repository path, for example ./workspace/repositories/sample-repo.
 
-http://localhost:3000
+Click Start Code Review.
 
-Select:
+Reviewing an Individual Commit
 
-Repository
+In the UI:
 
-Enter a repository path such as:
+Select Commit.
 
-./workspace/repositories/sample-repo
+Enter the repository path.
 
-Click:
+Enter a commit reference such as HEAD.
 
-Start Code Review
+Click Start Code Review.
 
-The system builds repository context and passes it to the Supervisor Agent.
+The system retrieves commit metadata, changed files, and the commit diff before running the review.
 
-Running a Commit Review
+Reviewing a Git Diff
 
-Select:
+In the UI:
 
-Commit
+Select Git Diff.
 
-Provide the repository path and commit reference.
+Paste the Git diff.
 
-Example:
+Click Start Code Review.
 
-Repository:
-./workspace/repositories/sample-repo
+The supplied diff is passed into the review-context pipeline.
 
-Commit:
-HEAD
+Reviewing a GitHub Pull Request
 
-Then start the review.
+The application supports GitHub Pull Request reviews.
 
-Running a Git Diff Review
+In the UI:
 
-Select:
+Select Pull Request.
 
-Git Diff
+Enter the repository in owner/repository format. Example: Aniking1/ai-code-reviewer.
 
-Paste a Git diff into the editor and start the review.
+Enter the Pull Request number. Example: 1.
 
-Review Findings
+Click Start Code Review.
 
-Each finding can contain:
+The frontend sends:
 
-Short title
-Category
-Severity
-Confidence
-File and line location where supported
-Explanation
-Potential impact
-Recommended fix
-Supporting evidence
-Specialist attribution
+{
+  "type": "pull_request",
+  "repository": "owner/repository",
+  "pullRequest": 123
+}
 
-Supported severity levels:
+The backend retrieves Pull Request metadata, base and target branch information, changed files, available file patches, and the complete Pull Request diff. That context then enters the existing Supervisor, specialist-agent, consolidation, recommendation, and history pipeline.
 
-CRITICAL
-HIGH
-MEDIUM
-LOW
-OPTIONAL
+Consolidation and Deduplication
 
-Supported recommendations:
+Specialist findings are consolidated before the final review is returned or saved.
 
-APPROVE
-APPROVE WITH COMMENTS
-REQUEST CHANGES
-BLOCK MERGE
+The consolidation stage:
 
-Findings are prioritized by severity and then confidence.
+Validates finding structure.
+
+Removes duplicate findings.
+
+Detects overlapping findings describing the same underlying defect.
+
+Retains the strongest justified finding.
+
+Sorts findings by severity and confidence.
+
+Determines the overall recommendation.
+
+Generates a concise summary.
+
+The live runReview() service invokes this consolidation before returning or saving the final review.
+
+Specialist Activity
+
+The UI records which specialists the Supervisor actually selected. This allows the reviewer to see Supervisor completion, selected specialists, and specialists that were not selected.
 
 Review History
 
-Completed reviews are stored in:
+Completed reviews can be revisited from the Review History section of the UI.
 
-workspace/review-history/
+The history view provides review type, repository, date, recommendation, findings, specialist activity, and review details.
 
-This directory contains generated runtime data and is ignored by Git.
+Runtime review-history data is generated locally and should not be committed to Git.
 
-The UI allows users to revisit saved reviews and inspect:
-
-Review recommendation
-Findings
-Specialist activity
-Review details
 API Endpoints
 
-Review:
+Review
 
 POST /review
 
-List review history:
+Accepts repository, commit, diff, and pull-request review inputs.
+
+List Review History
 
 GET /reviews
 
-Retrieve a specific review:
+Retrieve a Specific Review
 
 GET /reviews/:reviewId
+
 Testing
 
-Run the automated test suite:
+Run the complete automated test suite:
 
 npm test
 
 Current validated result:
 
-51 tests
-51 pass
+52 tests
+52 pass
 0 fail
+
+The suite covers repository operations, Git diffs, commit and repository context, Pull Request context, input validation, orchestration, specialist parsing, Supervisor orchestration, finding consolidation, review-service integration, review history, and repository tools.
 
 Run TypeScript validation:
 
 npx tsc --noEmit
+
 Production Builds
 
-Backend:
+Backend
+
+From the project root:
 
 npm run build
 
-Frontend:
+A successful Mastra build produces deployable output under:
+
+.mastra/output/
+
+Frontend
 
 cd frontend
 npm run build
-Evaluation
+
+Evaluation Scenarios
 
 The project contains five deliberately defective evaluation repositories:
 
@@ -281,25 +411,61 @@ evaluation-03-architecture
 evaluation-04-performance
 evaluation-05-maintainability
 
-The fixtures contain known defects covering:
+Scenario
+
+Review Area
+
+Expected Severity
+
+Expected Specialist
+
+evaluation-01-correctness
 
 Correctness
+
+HIGH
+
+correctness-logic
+
+evaluation-02-security
+
 Security
+
+HIGH/CRITICAL
+
+security
+
+evaluation-03-architecture
+
 Architecture
+
+MEDIUM/HIGH
+
+architecture-design
+
+evaluation-04-performance
+
 Performance
+
+HIGH
+
+performance-scalability
+
+evaluation-05-maintainability
+
 Maintainability
+
+MEDIUM/HIGH
+
+code-quality-maintainability
+
 Prepare Evaluation Fixtures
 
-The evaluation repositories require temporary local Git history containing:
-
-A clean baseline commit
-A deliberately defective commit
-
-After cloning the project into a clean environment, prepare the fixtures with:
+Run:
 
 npm run evaluation:setup
 
-This creates the required local Git history for the five scenarios.
+This prepares the clean baseline and deliberately defective commit for each scenario.
 
 Run the Evaluation
 
@@ -307,66 +473,76 @@ After preparing the fixtures:
 
 node --env-file=.env --import tsx evaluation/run-evaluation.mjs
 
-The evaluation validates the repository fixtures and then runs the live AI evaluation.
+The evaluation validates the fixtures and then performs the live AI evaluation.
 
-See:
+See evaluation/README.md for the intended defects and expected outcomes.
 
-evaluation/README.md
+Evaluation Validation
 
-for the expected defects and outcomes.
+The evaluation infrastructure checks repository existence, Git repository validity, HEAD commit, baseline parent commit, non-empty diff, clean working tree, expected review category, expected specialist, and expected severity.
 
-Evaluation Results
-
-The evaluation infrastructure checks:
-
-Repository existence
-Git repository validity
-HEAD commit
-Baseline parent commit
-Non-empty Git diff
-Clean working tree
-Expected review category
-Expected specialist
-Expected severity
-
-The five evaluation fixtures currently validate successfully.
-
-Live AI evaluation depends on the configured OpenRouter provider.
+Live AI evaluation depends on the configured OpenRouter provider. A provider or credit failure is distinguished from fixture validation failure in the evaluation reporting.
 
 Provider Error Handling
 
-If the OpenRouter provider cannot process a request, for example because the account has insufficient credits, the backend returns a structured provider-unavailable response.
-
-The frontend displays a clear error instead of leaving the review request unresolved.
+When the configured AI provider cannot process a request, the backend returns a structured provider-unavailable response and the frontend displays a clear error.
 
 Previously completed reviews and review history remain available.
 
 Security
 
-Do not commit:
+Never commit:
 
 .env
 API keys
+GitHub tokens
 Credentials
-Repository tokens
-Generated review history
+Private repository credentials
+Generated runtime data
 
-API configuration uses:
+Environment variables used by the application include:
 
 OPENROUTER_API_KEY
 MODEL_NAME
+GITHUB_TOKEN
 
-These values are supplied through environment variables.
+Project Structure
 
-Current Limitation
+ai-code-reviewer/
+├── evaluation/
+│   ├── README.md
+│   ├── run-evaluation.mjs
+│   └── setup-fixtures.mjs
+│
+├── frontend/
+│   └── app/
+│       └── page.tsx
+│
+├── src/
+│   └── mastra/
+│       ├── agents/
+│       │   ├── review-agent.ts
+│       │   ├── specialist-output.ts
+│       │   └── specialists/
+│       ├── routes/
+│       │   ├── history-routes.ts
+│       │   └── review-route.ts
+│       ├── schemas/
+│       ├── services/
+│       │   ├── github/
+│       │   ├── history/
+│       │   ├── repository/
+│       │   └── review/
+│       └── tools/
+│
+├── workspace/
+│   └── repositories/
+│
+├── .env.example
+├── .gitignore
+├── package.json
+└── README.md
 
-GitHub pull-request review integration is not currently implemented.
-
-The current supported review inputs are:
-
-Local or cloned Git repositories
-Individual Git commits
-Git diffs
 Development Commands
 
 Backend:
@@ -375,47 +551,30 @@ npm run dev
 npm test
 npm run build
 
-Evaluation fixtures:
-
-npm run evaluation:setup
-
-Evaluation:
-
-node --env-file=.env --import tsx evaluation/run-evaluation.mjs
-
 Frontend:
 
 cd frontend
 npm run dev
 npm run build
-Project Structure
-ai-code-reviewer/
-├── src/
-│   └── mastra/
-│       ├── agents/
-│       │   ├── review-agent.ts
-│       │   └── specialists/
-│       ├── routes/
-│       ├── schemas/
-│       ├── services/
-│       │   ├── history/
-│       │   ├── repository/
-│       │   └── review/
-│       ├── tools/
-│       └── index.ts
-├── frontend/
-│   └── app/
-├── evaluation/
-│   ├── README.md
-│   ├── run-evaluation.mjs
-│   └── setup-fixtures.mjs
-├── workspace/
-│   └── repositories/
-├── .env.example
-├── .gitignore
-├── package.json
-├── package-lock.json
-└── README.md
-License
 
-This project was developed as a KodeCamp capstone project.
+Evaluation:
+
+npm run evaluation:setup
+node --env-file=.env --import tsx evaluation/run-evaluation.mjs
+
+Current Validation Status
+
+The current local implementation has been validated with:
+
+TypeScript compilation: PASS
+Automated tests: 52/52 PASS
+Backend production build: PASS
+Frontend production build: PASS
+Pull Request context test: PASS
+Live review-service consolidation test: PASS
+
+GitHub Repository
+
+https://github.com/Aniking1/ai-code-reviewer
+
+The repository should be public for capstone evaluation.
