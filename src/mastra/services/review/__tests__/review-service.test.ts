@@ -124,3 +124,87 @@ test(
     );
   },
 );
+
+test(
+  "runReview consolidates duplicate findings from the review runner",
+  async () => {
+    const result = await runReview(
+      {
+        type: "diff",
+        diff:
+          "diff --git a/hello.ts b/hello.ts",
+      },
+      {
+        saveToHistory: false,
+        reviewRunner: async () => {
+          return {
+            summary:
+              "Duplicate findings should be consolidated.",
+            findings: [
+              {
+                id: "SEC-001",
+                title:
+                  "Command injection through user input",
+                category: "SECURITY",
+                severity: "HIGH",
+                confidence: "HIGH",
+                file: "hello.ts",
+                lineStart: 10,
+                lineEnd: 10,
+                explanation:
+                  "User-controlled input reaches shell execution.",
+                impact:
+                  "An attacker could execute arbitrary commands.",
+                recommendation:
+                  "Avoid shell execution of untrusted input.",
+                evidence:
+                  "The user input is passed directly to command execution.",
+                specialist: "security",
+              },
+              {
+                id: "SEC-002",
+                title:
+                  "Command injection through user input",
+                category: "SECURITY",
+                severity: "HIGH",
+                confidence: "MEDIUM",
+                file: "hello.ts",
+                lineStart: 10,
+                lineEnd: 10,
+                explanation:
+                  "Untrusted user input reaches shell execution.",
+                impact:
+                  "This may allow arbitrary command execution.",
+                recommendation:
+                  "Validate input and avoid shell command interpolation.",
+                evidence:
+                  "The same user-controlled value reaches command execution.",
+                specialist: "correctness-logic",
+              },
+            ],
+          };
+        },
+      },
+    );
+
+    assert.equal(
+      result.review.findings.length,
+      1,
+    );
+
+    assert.equal(
+      result.review.findings[0]?.id,
+      "SEC-001",
+    );
+
+    assert.equal(
+      result.review.findings[0]?.confidence,
+      "HIGH",
+    );
+
+    assert.equal(
+      result.review.findings[0]?.severity,
+      "HIGH",
+    );
+  },
+);

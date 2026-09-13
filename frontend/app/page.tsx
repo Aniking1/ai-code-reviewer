@@ -1,6 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ??
@@ -9,7 +13,8 @@ const API_BASE =
 type ReviewMode =
   | "repository"
   | "commit"
-  | "diff";
+  | "diff"
+  | "pull_request";
 
 type SpecialistActivity = {
   id: string;
@@ -56,6 +61,8 @@ type ReviewContext = {
   repositoryName?: string;
   branch?: string;
   commit?: string;
+  baseRef?: string;
+  targetRef?: string;
 };
 
 type ReviewResponse = {
@@ -120,8 +127,12 @@ const specialists = [
   },
 ] as const;
 
-function formatDate(value: string) {
-  return new Date(value).toLocaleString();
+function formatDate(
+  value: string,
+) {
+  return new Date(
+    value,
+  ).toLocaleString();
 }
 
 function recommendationClass(
@@ -130,12 +141,16 @@ function recommendationClass(
   switch (recommendation) {
     case "APPROVE":
       return "bg-emerald-100 text-emerald-700";
+
     case "APPROVE WITH COMMENTS":
       return "bg-amber-100 text-amber-700";
+
     case "REQUEST CHANGES":
       return "bg-orange-100 text-orange-700";
+
     case "BLOCK MERGE":
       return "bg-red-100 text-red-700";
+
     default:
       return "bg-slate-100 text-slate-700";
   }
@@ -143,15 +158,29 @@ function recommendationClass(
 
 export default function Home() {
   const [mode, setMode] =
-    useState<ReviewMode>("repository");
-
-  const [repositoryPath, setRepositoryPath] =
-    useState(
-      "./workspace/repositories/sample-repo",
+    useState<ReviewMode>(
+      "repository",
     );
+
+  const [
+    repositoryPath,
+    setRepositoryPath,
+  ] = useState(
+    "./workspace/repositories/sample-repo",
+  );
 
   const [commit, setCommit] =
     useState("HEAD");
+
+  const [
+    pullRequestRepository,
+    setPullRequestRepository,
+  ] = useState("");
+
+  const [
+    pullRequestNumber,
+    setPullRequestNumber,
+  ] = useState("");
 
   const [diff, setDiff] =
     useState("");
@@ -162,41 +191,68 @@ export default function Home() {
   const [error, setError] =
     useState("");
 
-  const [result, setResult] =
-    useState<ReviewResponse | null>(null);
+  const [
+    result,
+    setResult,
+  ] =
+    useState<ReviewResponse | null>(
+      null,
+    );
 
   const [history, setHistory] =
-    useState<HistoryRecord[]>([]);
+    useState<HistoryRecord[]>(
+      [],
+    );
 
-  const [historyLoading, setHistoryLoading] =
-    useState(false);
+  const [
+    historyLoading,
+    setHistoryLoading,
+  ] = useState(false);
 
-  const [detail, setDetail] =
-    useState<HistoryRecord | null>(null);
+  const [
+    detail,
+    setDetail,
+  ] =
+    useState<HistoryRecord | null>(
+      null,
+    );
 
-  const [detailLoading, setDetailLoading] =
-    useState(false);
+  const [
+    detailLoading,
+    setDetailLoading,
+  ] = useState(false);
 
-  const [detailError, setDetailError] =
-    useState("");
+  const [
+    detailError,
+    setDetailError,
+  ] = useState("");
 
-  const [severityFilter, setSeverityFilter] =
-    useState("ALL");
+  const [
+    severityFilter,
+    setSeverityFilter,
+  ] = useState("ALL");
 
-  const [categoryFilter, setCategoryFilter] =
-    useState("ALL");
+  const [
+    categoryFilter,
+    setCategoryFilter,
+  ] = useState("ALL");
 
-  const [fileFilter, setFileFilter] =
-    useState("ALL");
+  const [
+    fileFilter,
+    setFileFilter,
+  ] = useState("ALL");
 
   async function loadHistory() {
     setHistoryLoading(true);
 
     try {
-      const response = await fetch(
-        `${API_BASE}/reviews`,
-        { cache: "no-store" },
-      );
+      const response =
+        await fetch(
+          `${API_BASE}/reviews`,
+          {
+            cache: "no-store",
+          },
+        );
 
       if (!response.ok) {
         throw new Error(
@@ -204,10 +260,13 @@ export default function Home() {
         );
       }
 
-      const payload = await response.json();
+      const payload =
+        await response.json();
 
       setHistory(
-        Array.isArray(payload.reviews)
+        Array.isArray(
+          payload.reviews,
+        )
           ? payload.reviews
           : [],
       );
@@ -233,10 +292,13 @@ export default function Home() {
     setDetailLoading(true);
 
     try {
-      const response = await fetch(
-        `${API_BASE}/reviews/${reviewId}`,
-        { cache: "no-store" },
-      );
+      const response =
+        await fetch(
+          `${API_BASE}/reviews/${reviewId}`,
+          {
+            cache: "no-store",
+          },
+        );
 
       if (!response.ok) {
         throw new Error(
@@ -248,9 +310,12 @@ export default function Home() {
         await response.json();
 
       const historyReview =
-        payload.review ?? payload;
+        payload.review ??
+        payload;
 
-      setDetail(historyReview);
+      setDetail(
+        historyReview,
+      );
     } catch (error) {
       setDetailError(
         error instanceof Error
@@ -271,20 +336,86 @@ export default function Home() {
     setCategoryFilter("ALL");
     setFileFilter("ALL");
 
-    let body;
+    let body:
+      | {
+          type: "repository";
+          repositoryPath: string;
+        }
+      | {
+          type: "commit";
+          repositoryPath: string;
+          commit: string;
+        }
+      | {
+          type: "diff";
+          diff: string;
+        }
+      | {
+          type: "pull_request";
+          repository: string;
+          pullRequest: number;
+        };
 
     if (mode === "repository") {
       body = {
         type: "repository",
         repositoryPath,
       };
-    } else if (mode === "commit") {
+    } else if (
+      mode === "commit"
+    ) {
       body = {
         type: "commit",
         repositoryPath,
         commit,
       };
+    } else if (
+      mode === "pull_request"
+    ) {
+      const repository =
+        pullRequestRepository.trim();
+
+      const number =
+        Number.parseInt(
+          pullRequestNumber,
+          10,
+        );
+
+      if (!repository) {
+        setError(
+          "Please provide a GitHub repository.",
+        );
+        setLoading(false);
+        return;
+      }
+
+      if (
+        !Number.isInteger(
+          number,
+        ) ||
+        number <= 0
+      ) {
+        setError(
+          "Please provide a valid pull request number.",
+        );
+        setLoading(false);
+        return;
+      }
+
+      body = {
+        type: "pull_request",
+        repository,
+        pullRequest: number,
+      };
     } else {
+      if (!diff.trim()) {
+        setError(
+          "Please provide a Git diff.",
+        );
+        setLoading(false);
+        return;
+      }
+
       body = {
         type: "diff",
         diff,
@@ -292,24 +423,29 @@ export default function Home() {
     }
 
     try {
-      const response = await fetch(
-        `${API_BASE}/review`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type":
-              "application/json",
+      const response =
+        await fetch(
+          `${API_BASE}/review`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+            body:
+              JSON.stringify(
+                body,
+              ),
           },
-          body: JSON.stringify(body),
-        },
-      );
+        );
 
       const payload =
         await response.json();
 
       if (!response.ok) {
         if (
-          response.status === 503 &&
+          response.status ===
+            503 &&
           payload.code ===
             "AI_PROVIDER_UNAVAILABLE"
         ) {
@@ -328,6 +464,7 @@ export default function Home() {
       }
 
       setResult(payload);
+
       await loadHistory();
     } catch (error) {
       setError(
@@ -341,20 +478,31 @@ export default function Home() {
   }
 
   const findings =
-    result?.review.findings ?? [];
+    result?.review.findings ??
+    [];
 
   const filteredFindings =
     useMemo(() => {
       return findings.filter(
         (finding) =>
-          (severityFilter === "ALL" ||
+          (
+            severityFilter ===
+              "ALL" ||
             finding.severity ===
-              severityFilter) &&
-          (categoryFilter === "ALL" ||
+              severityFilter
+          ) &&
+          (
+            categoryFilter ===
+              "ALL" ||
             finding.category ===
-              categoryFilter) &&
-          (fileFilter === "ALL" ||
-            finding.file === fileFilter),
+              categoryFilter
+          ) &&
+          (
+            fileFilter ===
+              "ALL" ||
+            finding.file ===
+              fileFilter
+          ),
       );
     }, [
       findings,
@@ -364,15 +512,19 @@ export default function Home() {
     ]);
 
   const files =
-    [...new Set(
-      findings.map(
-        (finding) => finding.file,
+    [
+      ...new Set(
+        findings.map(
+          (finding) =>
+            finding.file,
+        ),
       ),
-    )].sort();
+    ].sort();
 
   const activity =
     result?.review.activity
-      ?.specialists ?? [];
+      ?.specialists ??
+    [];
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-950">
@@ -410,12 +562,25 @@ export default function Home() {
               Choose the review source.
             </p>
 
-            <div className="mt-5 grid grid-cols-3 gap-2">
+            <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
               {(
                 [
-                  ["repository", "Repository"],
-                  ["commit", "Commit"],
-                  ["diff", "Git Diff"],
+                  [
+                    "repository",
+                    "Repository",
+                  ],
+                  [
+                    "commit",
+                    "Commit",
+                  ],
+                  [
+                    "diff",
+                    "Git Diff",
+                  ],
+                  [
+                    "pull_request",
+                    "Pull Request",
+                  ],
                 ] as const
               ).map(
                 ([value, label]) => (
@@ -423,7 +588,9 @@ export default function Home() {
                     key={value}
                     type="button"
                     onClick={() =>
-                      setMode(value)
+                      setMode(
+                        value,
+                      )
                     }
                     className={`rounded-xl border px-3 py-3 text-sm font-medium ${
                       mode === value
@@ -438,25 +605,35 @@ export default function Home() {
             </div>
 
             <div className="mt-5 space-y-4">
-              {mode !== "diff" && (
+              {(mode ===
+                "repository" ||
+                mode ===
+                  "commit") && (
                 <label className="block">
                   <span className="mb-2 block text-sm font-medium">
                     Repository path
                   </span>
 
                   <input
-                    value={repositoryPath}
-                    onChange={(event) =>
+                    value={
+                      repositoryPath
+                    }
+                    onChange={(
+                      event,
+                    ) =>
                       setRepositoryPath(
-                        event.target.value,
+                        event.target
+                          .value,
                       )
                     }
+                    placeholder="./workspace/repositories/sample-repo"
                     className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-blue-500"
                   />
                 </label>
               )}
 
-              {mode === "commit" && (
+              {mode ===
+                "commit" && (
                 <label className="block">
                   <span className="mb-2 block text-sm font-medium">
                     Commit
@@ -464,17 +641,84 @@ export default function Home() {
 
                   <input
                     value={commit}
-                    onChange={(event) =>
+                    onChange={(
+                      event,
+                    ) =>
                       setCommit(
-                        event.target.value,
+                        event.target
+                          .value,
                       )
                     }
+                    placeholder="HEAD"
                     className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-blue-500"
                   />
                 </label>
               )}
 
-              {mode === "diff" && (
+              {mode ===
+                "pull_request" && (
+                <div className="space-y-4">
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-medium">
+                      GitHub repository
+                    </span>
+
+                    <input
+                      type="text"
+                      value={
+                        pullRequestRepository
+                      }
+                      onChange={(
+                        event,
+                      ) =>
+                        setPullRequestRepository(
+                          event.target
+                            .value,
+                        )
+                      }
+                      placeholder="owner/repository"
+                      className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-blue-500"
+                    />
+
+                    <p className="mt-1 text-xs text-slate-500">
+                      Example:
+                      Aniking1/ai-code-reviewer
+                    </p>
+                  </label>
+
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-medium">
+                      Pull Request
+                    </span>
+
+                    <input
+                      type="number"
+                      min="1"
+                      value={
+                        pullRequestNumber
+                      }
+                      onChange={(
+                        event,
+                      ) =>
+                        setPullRequestNumber(
+                          event.target
+                            .value,
+                        )
+                      }
+                      placeholder="123"
+                      className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-blue-500"
+                    />
+
+                    <p className="mt-1 text-xs text-slate-500">
+                      Enter the GitHub pull
+                      request number.
+                    </p>
+                  </label>
+                </div>
+              )}
+
+              {mode ===
+                "diff" && (
                 <label className="block">
                   <span className="mb-2 block text-sm font-medium">
                     Git diff
@@ -482,12 +726,16 @@ export default function Home() {
 
                   <textarea
                     value={diff}
-                    onChange={(event) =>
+                    onChange={(
+                      event,
+                    ) =>
                       setDiff(
-                        event.target.value,
+                        event.target
+                          .value,
                       )
                     }
                     rows={10}
+                    placeholder="Paste your Git diff here..."
                     className="w-full rounded-xl border border-slate-300 px-4 py-3 font-mono text-xs outline-none focus:border-blue-500"
                   />
                 </label>
@@ -595,7 +843,8 @@ export default function Home() {
                 </p>
 
                 <h2 className="mt-1 text-2xl font-bold">
-                  {result.context.repositoryName ??
+                  {result.context
+                    .repositoryName ??
                     "Code Review"}
                 </h2>
               </div>
@@ -623,30 +872,64 @@ export default function Home() {
 
               <Stat
                 label="Review type"
-                value={result.context.type}
+                value={
+                  result.context
+                    .type
+                }
               />
 
               <Stat
                 label="Branch"
                 value={
-                  result.context.branch ??
-                  "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"
+                  result.context
+                    .branch ??
+                  "—"
                 }
               />
             </div>
+
+            {result.context
+              .type ===
+              "pull_request" && (
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                <Stat
+                  label="Base"
+                  value={
+                    result.context
+                      .baseRef ??
+                    "—"
+                  }
+                />
+
+                <Stat
+                  label="Target"
+                  value={
+                    result.context
+                      .targetRef ??
+                    "—"
+                  }
+                />
+              </div>
+            )}
 
             <div className="mt-5 rounded-xl bg-slate-50 p-4 text-sm text-slate-700">
               {result.review.summary}
             </div>
 
-            {findings.length > 0 && (
+            {findings.length >
+              0 && (
               <>
                 <div className="mt-5 grid gap-3 md:grid-cols-3">
                   <select
-                    value={severityFilter}
-                    onChange={(event) =>
+                    value={
+                      severityFilter
+                    }
+                    onChange={(
+                      event,
+                    ) =>
                       setSeverityFilter(
-                        event.target.value,
+                        event.target
+                          .value,
                       )
                     }
                     className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
@@ -654,6 +937,7 @@ export default function Home() {
                     <option value="ALL">
                       Severity: ALL
                     </option>
+
                     {[
                       "CRITICAL",
                       "HIGH",
@@ -663,8 +947,12 @@ export default function Home() {
                     ].map(
                       (value) => (
                         <option
-                          key={value}
-                          value={value}
+                          key={
+                            value
+                          }
+                          value={
+                            value
+                          }
                         >
                           Severity:{" "}
                           {value}
@@ -674,10 +962,15 @@ export default function Home() {
                   </select>
 
                   <select
-                    value={categoryFilter}
-                    onChange={(event) =>
+                    value={
+                      categoryFilter
+                    }
+                    onChange={(
+                      event,
+                    ) =>
                       setCategoryFilter(
-                        event.target.value,
+                        event.target
+                          .value,
                       )
                     }
                     className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
@@ -696,8 +989,12 @@ export default function Home() {
                     ].map(
                       (value) => (
                         <option
-                          key={value}
-                          value={value}
+                          key={
+                            value
+                          }
+                          value={
+                            value
+                          }
                         >
                           Category:{" "}
                           {value}
@@ -707,10 +1004,15 @@ export default function Home() {
                   </select>
 
                   <select
-                    value={fileFilter}
-                    onChange={(event) =>
+                    value={
+                      fileFilter
+                    }
+                    onChange={(
+                      event,
+                    ) =>
                       setFileFilter(
-                        event.target.value,
+                        event.target
+                          .value,
                       )
                     }
                     className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
@@ -722,8 +1024,12 @@ export default function Home() {
                     {files.map(
                       (file) => (
                         <option
-                          key={file}
-                          value={file}
+                          key={
+                            file
+                          }
+                          value={
+                            file
+                          }
                         >
                           File: {file}
                         </option>
@@ -736,8 +1042,12 @@ export default function Home() {
                   {filteredFindings.map(
                     (finding) => (
                       <FindingCard
-                        key={finding.id}
-                        finding={finding}
+                        key={
+                          finding.id
+                        }
+                        finding={
+                          finding
+                        }
                       />
                     ),
                   )}
@@ -765,7 +1075,9 @@ export default function Home() {
               onClick={() =>
                 void loadHistory()
               }
-              disabled={historyLoading}
+              disabled={
+                historyLoading
+              }
               className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-50"
             >
               {historyLoading
@@ -775,7 +1087,8 @@ export default function Home() {
           </div>
 
           <div className="mt-5 space-y-3">
-            {history.length === 0 ? (
+            {history.length ===
+            0 ? (
               <div className="rounded-xl border border-dashed border-slate-300 px-4 py-8 text-center text-sm text-slate-500">
                 No saved reviews.
               </div>
@@ -796,13 +1109,17 @@ export default function Home() {
                   >
                     <div>
                       <p className="font-semibold">
-                        {record.repositoryName ??
-                          "Review"}
+                        {
+                          record.repositoryName ??
+                          "Review"
+                        }
                       </p>
 
                       <p className="mt-1 text-xs text-slate-500">
-                        {record.reviewType}{" "}
-                        Ãƒâ€šÃ‚Â·{" "}
+                        {
+                          record.reviewType
+                        }{" "}
+                        ·{" "}
                         {formatDate(
                           record.createdAt,
                         )}
@@ -821,7 +1138,7 @@ export default function Home() {
                       </span>
 
                       <span className="text-slate-400">
-                        ?
+                        →
                       </span>
                     </div>
                   </button>
@@ -846,15 +1163,19 @@ export default function Home() {
                 </p>
 
                 <h2 className="mt-1 text-xl font-bold">
-                  {detail.repositoryName ??
-                    "Review"}
+                  {
+                    detail.repositoryName ??
+                    "Review"
+                  }
                 </h2>
               </div>
 
               <button
                 type="button"
                 onClick={() =>
-                  setDetail(null)
+                  setDetail(
+                    null,
+                  )
                 }
                 className="rounded-lg px-3 py-2 text-sm text-slate-500 hover:bg-slate-100"
               >
@@ -886,13 +1207,16 @@ export default function Home() {
                 <Stat
                   label="Findings"
                   value={String(
-                    detail.findings.length,
+                    detail.findings
+                      .length,
                   )}
                 />
 
                 <Stat
                   label="Review type"
-                  value={detail.reviewType}
+                  value={
+                    detail.reviewType
+                  }
                 />
               </div>
 
@@ -916,7 +1240,9 @@ export default function Home() {
                     <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
                       {
                         detail.activity.specialists.filter(
-                          (specialist) =>
+                          (
+                            specialist,
+                          ) =>
                             specialist.status ===
                             "selected",
                         ).length
@@ -939,7 +1265,8 @@ export default function Home() {
                     </div>
 
                     <span className="text-xs font-semibold text-blue-700">
-                      {detail.activity?.supervisor ===
+                      {detail.activity
+                        ?.supervisor ===
                       "completed"
                         ? "Complete"
                         : "Not recorded"}
@@ -947,25 +1274,36 @@ export default function Home() {
                   </div>
 
                   {(
-                    detail.activity?.specialists ??
-                    specialists.map((specialist) => ({
-                      ...specialist,
-                      status:
-                        "not_selected" as const,
-                    }))
+                    detail.activity
+                      ?.specialists ??
+                    specialists.map(
+                      (
+                        specialist,
+                      ) => ({
+                        ...specialist,
+                        status:
+                          "not_selected" as const,
+                      }),
+                    )
                   ).map(
                     (specialist) => (
                       <div
-                        key={specialist.id}
+                        key={
+                          specialist.id
+                        }
                         className="flex items-center justify-between rounded-xl border border-slate-200 px-4 py-3"
                       >
                         <div>
                           <p className="text-sm font-semibold">
-                            {specialist.label}
+                            {
+                              specialist.label
+                            }
                           </p>
 
                           <p className="text-xs text-slate-500">
-                            {specialist.description}
+                            {
+                              specialist.description
+                            }
                           </p>
                         </div>
 
@@ -993,7 +1331,8 @@ export default function Home() {
                   Findings
                 </h3>
 
-                {detail.findings.length ===
+                {detail.findings
+                  .length ===
                 0 ? (
                   <div className="mt-3 rounded-xl border border-dashed border-slate-300 px-4 py-8 text-center text-sm text-slate-500">
                     No findings were recorded.
@@ -1003,8 +1342,12 @@ export default function Home() {
                     {detail.findings.map(
                       (finding) => (
                         <FindingCard
-                          key={finding.id}
-                          finding={finding}
+                          key={
+                            finding.id
+                          }
+                          finding={
+                            finding
+                          }
                         />
                       ),
                     )}
@@ -1016,15 +1359,16 @@ export default function Home() {
         </div>
       )}
 
-      {detailLoading && !detail && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
-          <div className="rounded-2xl bg-white px-6 py-5 shadow-xl">
-            <p className="text-sm text-slate-600">
-              Loading review details...
-            </p>
+      {detailLoading &&
+        !detail && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
+            <div className="rounded-2xl bg-white px-6 py-5 shadow-xl">
+              <p className="text-sm text-slate-600">
+                Loading review details...
+              </p>
+            </div>
           </div>
-        </div>
-      )}
+        )}
     </main>
   );
 }
@@ -1056,11 +1400,13 @@ function ActivityRow({
               : "bg-slate-100 text-slate-400"
           }`}
         >
-          {status === "not_selected"
-            ? "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"
-            : status === "waiting"
-              ? "ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢"
-              : "?"}
+          {status ===
+          "not_selected"
+            ? "−"
+            : status ===
+                "waiting"
+              ? "•"
+              : "✓"}
         </div>
 
         <div>
@@ -1077,9 +1423,11 @@ function ActivityRow({
       <span className="text-xs font-medium text-slate-500">
         {status === "selected"
           ? "Selected"
-          : status === "not_selected"
+          : status ===
+              "not_selected"
             ? "Not selected"
-            : status === "completed"
+            : status ===
+                "completed"
               ? "Complete"
               : "Waiting"}
       </span>
@@ -1100,7 +1448,7 @@ function Stat({
         {label}
       </p>
 
-      <p className="mt-1 text-sm font-semibold">
+      <p className="mt-1 break-all text-sm font-semibold">
         {value}
       </p>
     </div>
@@ -1144,9 +1492,11 @@ function FindingCard({
 
           <p className="mt-1 break-all font-mono text-xs">
             {finding.file}
+
             {finding.lineStart !==
               undefined &&
               `:${finding.lineStart}`}
+
             {finding.lineEnd !==
               undefined &&
               finding.lineEnd !==
@@ -1162,7 +1512,9 @@ function FindingCard({
             </p>
 
             <p className="mt-1 text-xs font-medium">
-              {finding.specialist}
+              {
+                finding.specialist
+              }
             </p>
           </div>
         )}
@@ -1187,7 +1539,9 @@ function FindingCard({
           <strong className="text-slate-800">
             Recommendation:
           </strong>{" "}
-          {finding.recommendation}
+          {
+            finding.recommendation
+          }
         </p>
 
         {finding.evidence && (

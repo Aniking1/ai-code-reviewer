@@ -1,19 +1,22 @@
-
 import type {
   ChangedFile,
   CommitInfo,
 } from "../repository/repository-service.js";
 
 import {
-  getChangedFiles,
   getCommit,
-  getDiff,
   getRepositoryInfo,
   listFiles,
   readFile,
 } from "../repository/repository-service.js";
 
 import type { ReviewInput } from "../../schemas/review-input.js";
+
+import {
+  getPullRequest,
+  getPullRequestDiff,
+  getPullRequestFiles,
+} from "../github/github-pr-service.js";
 
 export interface ReviewFileContext {
   path: string;
@@ -50,32 +53,39 @@ async function readChangedFiles(
   repositoryPath: string,
   changedFiles: ChangedFile[],
 ): Promise<ReviewFileContext[]> {
-  const readableFiles = changedFiles.filter(
-    (file) =>
-      file.status !== "deleted" &&
-      file.path.length > 0,
-  );
+  const readableFiles =
+    changedFiles.filter(
+      (file) =>
+        file.status !== "deleted" &&
+        file.path.length > 0,
+    );
 
-  const files = await Promise.all(
-    readableFiles.map(async (file) => {
-      try {
-        const content = await readFile(
-          repositoryPath,
-          file.path,
-        );
+  const files =
+    await Promise.all(
+      readableFiles.map(
+        async (file) => {
+          try {
+            const content =
+              await readFile(
+                repositoryPath,
+                file.path,
+              );
 
-        return {
-          path: file.path,
-          content,
-        };
-      } catch {
-        return null;
-      }
-    }),
-  );
+            return {
+              path: file.path,
+              content,
+            };
+          } catch {
+            return null;
+          }
+        },
+      ),
+    );
 
   return files.filter(
-    (file): file is ReviewFileContext =>
+    (
+      file,
+    ): file is ReviewFileContext =>
       file !== null,
   );
 }
@@ -86,27 +96,38 @@ async function buildRepositoryContext(
   const [
     repositoryInfo,
     repositoryFiles,
-  ] = await Promise.all([
-    getRepositoryInfo(repositoryPath),
-    listFiles(repositoryPath),
-  ]);
-
-  const files = await Promise.all(
-    repositoryFiles.map(async (filePath) => ({
-      path: filePath,
-      content: await readFile(
+  ] =
+    await Promise.all([
+      getRepositoryInfo(
         repositoryPath,
-        filePath,
       ),
-    })),
-  );
+      listFiles(repositoryPath),
+    ]);
+
+  const files =
+    await Promise.all(
+      repositoryFiles.map(
+        async (filePath) => ({
+          path: filePath,
+          content:
+            await readFile(
+              repositoryPath,
+              filePath,
+            ),
+        }),
+      ),
+    );
 
   return {
     type: "repository",
-    repositoryPath: repositoryInfo.path,
-    repositoryName: repositoryInfo.name,
-    branch: repositoryInfo.branch,
-    commit: repositoryInfo.commit,
+    repositoryPath:
+      repositoryInfo.path,
+    repositoryName:
+      repositoryInfo.name,
+    branch:
+      repositoryInfo.branch,
+    commit:
+      repositoryInfo.commit,
     changedFiles: [],
     diff: "",
     files,
@@ -121,27 +142,36 @@ async function buildCommitContext(
   repositoryPath: string,
   commitRef: string,
 ): Promise<ReviewContext> {
-  const commitInfo = await getCommit(
-    repositoryPath,
-    commitRef,
-  );
+  const commitInfo =
+    await getCommit(
+      repositoryPath,
+      commitRef,
+    );
 
   const repositoryInfo =
-    await getRepositoryInfo(repositoryPath);
+    await getRepositoryInfo(
+      repositoryPath,
+    );
 
-  const files = await readChangedFiles(
-    repositoryPath,
-    commitInfo.changedFiles,
-  );
+  const files =
+    await readChangedFiles(
+      repositoryPath,
+      commitInfo.changedFiles,
+    );
 
   return {
     type: "commit",
-    repositoryPath: repositoryInfo.path,
-    repositoryName: repositoryInfo.name,
-    branch: repositoryInfo.branch,
-    commit: commitInfo.hash,
+    repositoryPath:
+      repositoryInfo.path,
+    repositoryName:
+      repositoryInfo.name,
+    branch:
+      repositoryInfo.branch,
+    commit:
+      commitInfo.hash,
     commitInfo,
-    changedFiles: commitInfo.changedFiles,
+    changedFiles:
+      commitInfo.changedFiles,
     diff: commitInfo.diff,
     files,
     summary:
@@ -165,12 +195,108 @@ async function buildDiffContext(
   };
 }
 
+async function buildPullRequestContext(
+  repository: string,
+  pullRequestNumber: number,
+): Promise<ReviewContext> {
+  const [
+    pullRequest,
+    pullRequestFiles,
+    diff,
+  ] =
+    await Promise.all([
+      getPullRequest(
+        repository,
+        pullRequestNumber,
+      ),
+      getPullRequestFiles(
+        repository,
+        pullRequestNumber,
+      ),
+      getPullRequestDiff(
+        repository,
+        pullRequestNumber,
+      ),
+    ]);
+
+  const changedFiles: ChangedFile[] =
+    pullRequestFiles.map(
+      (file) => ({
+        path: file.path,
+        status: file.status,
+        previousPath:
+          file.previousPath,
+      }),
+    );
+
+  /*
+   * GitHub's pull-request files endpoint
+   * provides a patch for most text-file changes.
+   *
+   * We expose those patches as file-level review
+   * evidence so the specialists can reason about
+   * individual changed files as well as the complete
+   * pull-request diff.
+   */
+  const files: ReviewFileContext[] =
+    pullRequestFiles
+      .filter(
+        (file) =>
+          file.status !==
+            "deleted" &&
+          file.path.length > 0 &&
+          Boolean(file.patch),
+      )
+      .map(
+        (file) => ({
+          path: file.path,
+          content:
+            file.patch ??
+            "",
+        }),
+      );
+
+  return {
+    type: "pull_request",
+
+    repositoryName:
+      `${pullRequest.owner}/${pullRequest.repository}`,
+
+    branch:
+      pullRequest.headBranch,
+
+    commit:
+      pullRequest.headSha,
+
+    baseRef:
+      pullRequest.baseBranch,
+
+    targetRef:
+      pullRequest.headBranch,
+
+    changedFiles,
+
+    diff,
+
+    files,
+
+    summary:
+      `Pull request #${pullRequest.number}: ` +
+      `${pullRequest.title}. ` +
+      `Review changes from ` +
+      `${pullRequest.headBranch} into ` +
+      `${pullRequest.baseBranch}.`,
+  };
+}
+
 export async function buildReviewContext(
   input: ReviewInput,
 ): Promise<ReviewContext> {
   switch (input.type) {
     case "diff":
-      return buildDiffContext(input.diff);
+      return buildDiffContext(
+        input.diff,
+      );
 
     case "commit":
       return buildCommitContext(
@@ -184,16 +310,16 @@ export async function buildReviewContext(
       );
 
     case "pull_request":
-      throw new Error(
-        "Pull request review is not yet supported. " +
-          "GitHub pull request integration must be configured " +
-          "before pull_request reviews can be processed.",
+      return buildPullRequestContext(
+        input.repository,
+        input.pullRequest,
       );
 
     default: {
-      const exhaustiveCheck: never = input;
+      const exhaustiveCheck:
+        never = input;
+
       return exhaustiveCheck;
     }
   }
 }
-
