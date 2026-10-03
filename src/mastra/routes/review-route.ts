@@ -74,6 +74,10 @@ export const reviewApiRoute =
                 result.context.branch,
               commit:
                 result.context.commit,
+              baseRef:
+                result.context.baseRef,
+              targetRef:
+                result.context.targetRef,
               changedFiles:
                 result.context
                   .changedFiles,

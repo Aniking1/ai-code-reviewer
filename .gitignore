@@ -14,3 +14,5 @@ coverage
 workspace/*
 !workspace/repositories/
 !workspace/repositories/**
+evaluation/evaluation-report.json
+src/mastra/public/workspace/review-history/
